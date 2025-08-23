@@ -1,6 +1,8 @@
 package stage.spring.controllers;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import stage.spring.entities.HistoriqueChatbot;
 import stage.spring.entities.Utilisateur;
@@ -8,6 +10,7 @@ import stage.spring.services.ChatbotService;
 import stage.spring.session.SessionUtilisateur;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 
@@ -25,14 +28,27 @@ public class ChatbotController {
     }
 
     @PostMapping("/message")
-    public String envoyerMessage(@RequestParam String message) {
-        // Récupération de l'utilisateur connecté via la session
-        Utilisateur user = sessionUtilisateur.getUtilisateurConnecte();
-        if (user == null) {
-            throw new RuntimeException("Aucun utilisateur connecté !");
-        }
+    public ResponseEntity<Map<String, String>> envoyerMessage(@RequestParam String message) {
+        try {
+            // Récupération de l'utilisateur connecté via la session
+            Utilisateur user = sessionUtilisateur.getUtilisateurConnecte();
+            if (user == null) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                        .body(Map.of("error", "Aucun utilisateur connecté !"));
+            }
 
-        return chatbotService.envoyerMessage(user, message);
+            String reponse = chatbotService.sendPromptToChatBot(user, message);
+
+            // Retourner une réponse structurée pour Angular
+            return ResponseEntity.ok(Map.of(
+                    "success", "true",
+                    "message", reponse
+            ));
+
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Erreur lors du traitement: " + e.getMessage()));
+        }
     }
     // 🔹 Messages du jour
     @GetMapping("/today")

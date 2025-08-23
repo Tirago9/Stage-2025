@@ -11,9 +11,13 @@ import stage.spring.services.UtilisateurService;
 import stage.spring.session.SessionUtilisateur;
 
 
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Random;
 
+
+@CrossOrigin(origins = "http://localhost:4200", allowCredentials = "true")
 @RestController
 @RequestMapping("/auth")
 public class AuthController {
@@ -29,25 +33,39 @@ public class AuthController {
     private SessionUtilisateur sessionUtilisateur;
 
     @PostMapping("/signup")
-    public Utilisateur signup(@RequestBody Utilisateur utilisateur) {
-        Utilisateur newUser = utilisateurService.inscription(utilisateur);
-        sessionUtilisateur.setUtilisateurConnecte(newUser);
-        return newUser;
+    public ResponseEntity<?> signup(@RequestBody Utilisateur utilisateur) {
+        try {
+            Utilisateur newUser = utilisateurService.inscription(utilisateur);
+            sessionUtilisateur.setUtilisateurConnecte(newUser);
+            return ResponseEntity.ok(newUser);
+        } catch (UtilisateurService.EmailDejaUtiliseException e) {
+            Map<String, String> errorResponse = new HashMap<>();
+            errorResponse.put("message", e.getMessage());
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errorResponse);
+        } catch (Exception e) {
+            Map<String, String> errorResponse = new HashMap<>();
+            errorResponse.put("message", "Erreur lors de l'inscription: " + e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
+        }
     }
 
 
     @PostMapping("/login")
-    public Utilisateur login(@RequestParam String email, @RequestParam String motdepasse) {
+    public ResponseEntity<Utilisateur> login(@RequestBody Map<String, String> credentials) {
+        String email = credentials.get("email");
+        String motdepasse = credentials.get("password");
+
         Utilisateur user = utilisateurService.connexion(email, motdepasse);
         sessionUtilisateur.setUtilisateurConnecte(user);
 
-        int code = new Random().nextInt(900000) + 100000; // 100000 à 999999
+        int code = new Random().nextInt(900000) + 100000;
         sessionUtilisateur.setEmailVerifCode(code);
         emailService.envoyerCodeVerification(email, code);
+        System.out.println(sessionUtilisateur.getEmailVerifCode());
 
-
-        return user;
+        return ResponseEntity.ok(user);
     }
+
 
 
 
@@ -59,14 +77,23 @@ public class AuthController {
     }
 
     @PostMapping("/verify-email-code")
-    public String verifierCodeEmail(@RequestParam int code) {
+    public ResponseEntity<Map<String, String>> verifierCodeEmail(@RequestBody Map<String, Integer> requestBody) {
+        Integer code = requestBody.get("code");
         Integer codeSession = sessionUtilisateur.getEmailVerifCode();
-        if (codeSession != null && codeSession == code) {
-            sessionUtilisateur.setEmailVerifCode(null);
-            return "Vérification réussie, accès autorisé.";
+        System.out.println(code);
+        System.out.println(codeSession);
+
+        Map<String, String> response = new HashMap<>();
+
+        if (codeSession != null && codeSession.equals(code)) {
+            response.put("message", "Vérification réussie, accès autorisé.");
+            return ResponseEntity.ok(response);
         }
-        return "Code de vérification invalide.";
+
+        response.put("message", "Code de vérification invalide.");
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
     }
+
 
     @PostMapping("/logout")
     public String logout() {
@@ -78,25 +105,8 @@ public class AuthController {
     private UtilisateurRepository utilisateurRepository;
 
 
-    @GetMapping("/utilisateur/{id}")
-    public ResponseEntity<Utilisateur> getProfile(@PathVariable Long id) {
-        return utilisateurRepository.findById(id)
-                .map(ResponseEntity::ok)
-                .orElse(ResponseEntity.notFound().build());
-    }
 
-    @PutMapping("/profil")
-    public ResponseEntity<Utilisateur> updateProfil(@RequestBody Utilisateur updated) {
-        Utilisateur user = sessionUtilisateur.getUtilisateurConnecte();
-        if (user == null) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
-        }
-        // Mise à jour directe de l'utilisateur connecté
-        user.setNom(updated.getNom());
-        user.setPrenom(updated.getPrenom());
-        // ... autres champs
-        return ResponseEntity.ok(utilisateurRepository.save(user));
-    }
+
 
     @DeleteMapping("/utilisateur/{id}")
     public ResponseEntity<String> deleteCompte(@PathVariable Long id) {
@@ -121,15 +131,7 @@ public class AuthController {
         return ResponseEntity.notFound().build();
     }
 
-    @DeleteMapping("/profil")
-    public ResponseEntity<String> deleteProfil(SessionUtilisateur principal) {
-        Optional<Utilisateur> utilisateur = Optional.ofNullable(utilisateurRepository.findByEmail(principal.getUtilisateurConnecte().getNom()));
-        if (utilisateur.isPresent()) {
-            utilisateurRepository.delete(utilisateur.get());
-            return ResponseEntity.ok("Compte supprimé avec succès.");
-        }
-        return ResponseEntity.notFound().build();
-    }
+
 
 
 

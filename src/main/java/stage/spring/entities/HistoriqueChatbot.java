@@ -13,6 +13,8 @@ public class HistoriqueChatbot {
     private Long id;
 
     private String messageUser;
+    @Lob
+    @Column(columnDefinition = "TEXT")
     private String reponseIA;
     private LocalDateTime date;
 

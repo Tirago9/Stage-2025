@@ -1,6 +1,13 @@
 package stage.spring.services;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestTemplate;
 import stage.spring.entities.HistoriqueChatbot;
 import stage.spring.entities.Utilisateur;
@@ -17,11 +24,14 @@ import java.util.stream.Collectors;
 public class ChatbotService {
 
     private final HistoriqueChatbotRepository historiqueRepo;
-    private final RestTemplate restTemplate = new RestTemplate();
-    private final String chatbotUrl = "http://localhost:5678/webhook/e2baa463-1892-4c78-bbad-ecc8b17f6479";
+    private final RestTemplate restTemplate;
+    private final ObjectMapper objectMapper;
+    private final String chatbotUrl = "http://localhost:5678/webhook/fea68e2b-32e7-44cb-ad14-aa5688e3e10e";
 
-    public ChatbotService(HistoriqueChatbotRepository historiqueRepo) {
+    public ChatbotService(HistoriqueChatbotRepository historiqueRepo, RestTemplate restTemplate, ObjectMapper objectMapper) {
         this.historiqueRepo = historiqueRepo;
+        this.restTemplate = restTemplate;
+        this.objectMapper = objectMapper;
     }
 
     public String envoyerMessage(Utilisateur utilisateur, String messageUser) {
@@ -41,6 +51,91 @@ public class ChatbotService {
         historiqueRepo.save(historique);
 
         return reponseIA;
+    }
+
+
+
+
+
+    public String sendPromptToChatBot(Utilisateur utilisateur, String prompt) {
+        try {
+            // 1. Préparer les headers avec le message dans la clé "message"
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+            headers.set("message", prompt); // Important : clé exacte attendue par l'agent IA
+
+            HttpEntity<String> request = new HttpEntity<>(null, headers); // Pas de body
+
+            // 2. Envoi de la requête
+            System.out.println("Envoi à n8n avec header 'message': " + prompt);
+            ResponseEntity<String> response = restTemplate.postForEntity(chatbotUrl, request, String.class);
+
+            // Stocker le corps de la réponse pour l'utiliser deux fois
+            String responseBody = response.getBody();
+            String texteBrut = ""; // Variable pour stocker le texte brut
+
+            // 3. Traitement de la réponse pour extraire le texte brut
+            if (responseBody == null || responseBody.isEmpty()) {
+                texteBrut = "Erreur: Réponse vide (code 200)";
+            } else {
+                try {
+                    JsonNode root = objectMapper.readTree(responseBody);
+
+                    if (root.isArray() && root.size() > 0) {
+                        JsonNode firstItem = root.get(0);
+                        if (firstItem.has("output")) {
+                            texteBrut = firstItem.get("output").asText();
+                        } else {
+                            texteBrut = firstItem.toString();
+                        }
+                    } else if (root.has("output")) {
+                        texteBrut = root.get("output").asText();
+                    } else {
+                        texteBrut = root.toString();
+                    }
+                } catch (Exception e) {
+                    texteBrut = responseBody; // Retour brut si erreur de parsing
+                }
+            }
+
+            // 4. Enregistrement dans la base de données
+            HistoriqueChatbot historique = new HistoriqueChatbot();
+            historique.setUtilisateur(utilisateur);
+            historique.setMessageUser(prompt);
+            historique.setReponseIA(texteBrut); // CHANGEMENT ICI: on enregistre le texte brut sans JSON
+            historique.setDate(LocalDateTime.now());
+            historiqueRepo.save(historique);
+
+            System.out.println("Réponse brute: " + responseBody);
+            System.out.println("Texte brut extrait: " + texteBrut);
+
+            return texteBrut;
+
+        } catch (HttpClientErrorException e) {
+            String errorMessage = "Erreur HTTP: " + e.getStatusCode() + " - " + e.getResponseBodyAsString();
+
+            // Enregistrement de l'erreur
+            HistoriqueChatbot historique = new HistoriqueChatbot();
+            historique.setUtilisateur(utilisateur);
+            historique.setMessageUser(prompt);
+            historique.setReponseIA(errorMessage);
+            historique.setDate(LocalDateTime.now());
+            historiqueRepo.save(historique);
+
+            return errorMessage;
+        } catch (Exception e) {
+            String errorMessage = "Erreur: " + e.getMessage();
+
+            // Enregistrement de l'erreur
+            HistoriqueChatbot historique = new HistoriqueChatbot();
+            historique.setUtilisateur(utilisateur);
+            historique.setMessageUser(prompt);
+            historique.setReponseIA(errorMessage);
+            historique.setDate(LocalDateTime.now());
+            historiqueRepo.save(historique);
+
+            return errorMessage;
+        }
     }
 
 

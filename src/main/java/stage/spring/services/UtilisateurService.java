@@ -14,9 +14,15 @@ public class UtilisateurService {
 
     private BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
 
+    public class EmailDejaUtiliseException extends RuntimeException {
+        public EmailDejaUtiliseException(String message) {
+            super(message);
+        }
+    }
+
     public Utilisateur inscription(Utilisateur utilisateur) {
         if (utilisateurRepository.existsByEmail(utilisateur.getEmail())) {
-            throw new RuntimeException("Email déjà utilisé");
+            throw new EmailDejaUtiliseException("Email déjà utilisé");
         }
 
         // Hasher le mot de passe
