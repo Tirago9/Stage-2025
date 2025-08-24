@@ -1,5 +1,6 @@
 package stage.spring.entities;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import java.util.List;
 
@@ -21,12 +22,15 @@ public class Utilisateur {
 
 
     @OneToMany(mappedBy = "utilisateur", cascade = CascadeType.ALL)
+    @JsonIgnore
     private List<ZoneSurveille> zonesSurveillees;
 
     @OneToMany(mappedBy = "utilisateur", cascade = CascadeType.ALL)
+    @JsonIgnore
     private List<HistoriqueChatbot> histoiresChatbot;
 
     @OneToMany(mappedBy = "utilisateur", cascade = CascadeType.ALL)
+    @JsonIgnore
     private List<Commande> commandes;
 
     public Utilisateur() {

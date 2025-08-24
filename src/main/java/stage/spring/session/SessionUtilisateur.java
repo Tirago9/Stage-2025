@@ -24,9 +24,9 @@ public class SessionUtilisateur {
     }
 
     public void setUtilisateurConnecte(Utilisateur utilisateurConnecte) {
-        if (this.utilisateurConnecte==null) {
-            this.utilisateurConnecte = utilisateurConnecte;
-        }
+
+        this.utilisateurConnecte = utilisateurConnecte;
+
     }
 
     public boolean estConnecte() {

@@ -2,6 +2,7 @@ package stage.spring.services;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -12,6 +13,7 @@ import org.springframework.web.client.RestTemplate;
 import stage.spring.entities.HistoriqueChatbot;
 import stage.spring.entities.Utilisateur;
 import stage.spring.repositories.HistoriqueChatbotRepository;
+import stage.spring.session.SessionUtilisateur;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -23,6 +25,10 @@ import java.util.stream.Collectors;
 @Service
 public class ChatbotService {
 
+    @Autowired
+    private SessionUtilisateur sessionUtilisateur;
+
+    @Autowired
     private final HistoriqueChatbotRepository historiqueRepo;
     private final RestTemplate restTemplate;
     private final ObjectMapper objectMapper;
@@ -139,22 +145,32 @@ public class ChatbotService {
     }
 
 
-    // 🔹 Conversation du jour
-    public List<HistoriqueChatbot> getConversationDuJour(Utilisateur utilisateur) {
+    // 🔹 Conversation du jour avec ID
+    public List<HistoriqueChatbot> getConversationDuJour() {
+        Utilisateur user = sessionUtilisateur.getUtilisateurConnecte();
+        System.out.println("Utilisateur connecté : " + user.getEmail() + user.getId());
+        if (user == null) return Collections.emptyList();
+
         LocalDateTime start = LocalDate.now().atStartOfDay();
         LocalDateTime end = LocalDate.now().atTime(23, 59, 59);
-        return historiqueRepo.findByUtilisateurAndDateBetweenOrderByDateAsc(utilisateur, start, end);
+
+        return historiqueRepo.findByUtilisateurIdAndDateBetweenOrderByDateAsc(user.getId(), start, end);
     }
 
-    // 🔹 Historique regroupé par jour
-    public Map<LocalDate, List<HistoriqueChatbot>> getHistoriqueParJour(Utilisateur utilisateur) {
-        List<HistoriqueChatbot> allMessages = historiqueRepo.findByUtilisateurOrderByDateAsc(utilisateur);
+    // 🔹 Historique complet par jour
+    public Map<LocalDate, List<HistoriqueChatbot>> getHistoriqueParJour() {
+        Utilisateur user = sessionUtilisateur.getUtilisateurConnecte();
+        if (user == null) return Collections.emptyMap();
+
+        List<HistoriqueChatbot> allMessages = historiqueRepo.findByUtilisateurIdOrderByDateAsc(user.getId());
         return allMessages.stream()
                 .collect(Collectors.groupingBy(
-                        msg -> msg.getDate().toLocalDate(), // clé = date sans heure
-                        LinkedHashMap::new,                 // garder l'ordre
+                        msg -> msg.getDate().toLocalDate(),
+                        LinkedHashMap::new,
                         Collectors.toList()
                 ));
     }
+
+
 }
 

@@ -14,6 +14,8 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 
+
+@CrossOrigin(origins = "http://localhost:4200", allowCredentials = "true")
 @RestController
 @RequestMapping("/api/chatbot")
 public class ChatbotController {
@@ -50,18 +52,14 @@ public class ChatbotController {
                     .body(Map.of("error", "Erreur lors du traitement: " + e.getMessage()));
         }
     }
-    // 🔹 Messages du jour
     @GetMapping("/today")
     public List<HistoriqueChatbot> getConversationDuJour() {
-        Utilisateur user = sessionUtilisateur.getUtilisateurConnecte();
-        return chatbotService.getConversationDuJour(user);
+        return chatbotService.getConversationDuJour();
     }
 
-    // 🔹 Historique regroupé par jour
     @GetMapping("/history-by-day")
     public Map<LocalDate, List<HistoriqueChatbot>> getHistoriqueParJour() {
-        Utilisateur user = sessionUtilisateur.getUtilisateurConnecte();
-        return chatbotService.getHistoriqueParJour(user);
+        return chatbotService.getHistoriqueParJour();
     }
 
 

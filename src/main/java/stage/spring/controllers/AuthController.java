@@ -4,6 +4,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.context.request.RequestContextHolder;
 import stage.spring.entities.Utilisateur;
 import stage.spring.repositories.UtilisateurRepository;
 import stage.spring.services.EmailService;
@@ -51,19 +52,37 @@ public class AuthController {
 
 
     @PostMapping("/login")
-    public ResponseEntity<Utilisateur> login(@RequestBody Map<String, String> credentials) {
-        String email = credentials.get("email");
-        String motdepasse = credentials.get("password");
+    public ResponseEntity<Map<String, Object>> login(@RequestBody Map<String, String> credentials) {
+        try {
+            String email = credentials.get("email");
+            String motdepasse = credentials.get("password");
 
-        Utilisateur user = utilisateurService.connexion(email, motdepasse);
-        sessionUtilisateur.setUtilisateurConnecte(user);
+            Utilisateur user = utilisateurService.connexion(email, motdepasse);
+            sessionUtilisateur.setUtilisateurConnecte(user);
 
-        int code = new Random().nextInt(900000) + 100000;
-        sessionUtilisateur.setEmailVerifCode(code);
-        emailService.envoyerCodeVerification(email, code);
-        System.out.println(sessionUtilisateur.getEmailVerifCode());
+            int code = new Random().nextInt(900000) + 100000;
+            sessionUtilisateur.setEmailVerifCode(code);
+            emailService.envoyerCodeVerification(email, code);
 
-        return ResponseEntity.ok(user);
+            // Retourner une réponse structurée
+            Map<String, Object> response = new HashMap<>();
+            response.put("message", "Connexion réussie");
+            response.put("user", Map.of(
+                    "id", user.getId(),
+                    "nom", user.getNom(),
+                    "prenom", user.getPrenom(),
+                    "email", user.getEmail()
+            ));
+            response.put("status", "success");
+
+            return ResponseEntity.ok(response);
+
+        } catch (Exception e) {
+            Map<String, Object> errorResponse = new HashMap<>();
+            errorResponse.put("status", "error");
+            errorResponse.put("message", "Email ou mot de passe incorrect");
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(errorResponse);
+        }
     }
 
 
@@ -138,12 +157,23 @@ public class AuthController {
 
 
 
-//    @GetMapping("/whoami")
-//    public Utilisateur getUtilisateurConnecte() {
-//        if (sessionUtilisateur.estConnecte()) {
-//            return sessionUtilisateur.getUtilisateurConnecte();
-//        }
-//        throw new RuntimeException("Pas d'utilisateur connecté");
-//    }
+    @GetMapping("/whoami")
+    public ResponseEntity<?> getUtilisateurConnecte() {
+        Utilisateur u = sessionUtilisateur.getUtilisateurConnecte();
+        if (u != null) {
+            // Créer un DTO léger
+            Map<String, Object> userDto = Map.of(
+                    "id", u.getId(),
+                    "nom", u.getNom(),
+                    "prenom", u.getPrenom(),
+                    "email", u.getEmail()
+            );
+            return ResponseEntity.ok(userDto);
+        }
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                .body(Map.of("message", "Pas d'utilisateur connecté"));
+    }
+
+
 
 }
