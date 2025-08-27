@@ -1,5 +1,6 @@
 package stage.spring.entities;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import java.time.LocalDate;
 
@@ -19,6 +20,7 @@ public class ZoneSurveille {
 
     @ManyToOne
     @JoinColumn(name = "user_id")
+    @JsonIgnore
     private Utilisateur utilisateur;
 
     public ZoneSurveille() {

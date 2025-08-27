@@ -12,9 +12,12 @@ import stage.spring.services.ZoneSurveilleService;
 import stage.spring.session.SessionUtilisateur;
 
 import stage.spring.session.SessionUtilisateur;
+
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 
+@CrossOrigin(origins = "http://localhost:4200", allowCredentials = "true")
 @RestController
 @RequestMapping("/api/zones")
 public class ZoneSurveilleController {
@@ -75,11 +78,44 @@ public class ZoneSurveilleController {
                 .orElse(ResponseEntity.notFound().build());
     }
 
+//    @GetMapping("/zones")
+//    public ResponseEntity<List<ZoneSurveille>> getZonesUtilisateur(SessionUtilisateur principal) {
+//        //Optional<Utilisateur> utilisateur = Optional.ofNullable(utilisateurRepository.findByEmail(principal.getUtilisateurConnecte().getNom()));
+//        Optional<Utilisateur> utilisateur = utilisateurRepository.findById(Long.valueOf(20));
+//        return utilisateur.map(u -> ResponseEntity.ok(zoneSurveilleRepository.findByUtilisateur(u)))
+//                .orElse(ResponseEntity.notFound().build());
+//    }
+
+
+
+//    @GetMapping("/zones")
+//    public ResponseEntity<List<ZoneSurveille>> getZonesUtilisateur() {
+//        //Utilisateur utilisateur = sessionUtilisateur.getUtilisateurConnecte();
+//        Long userId = 20L; // À remplacer par l'ID de l'utilisateur connecté
+//        Optional<Utilisateur> utilisateur = utilisateurRepository.findById(userId);
+//        //Optional<Utilisateur> utilisateur = utilisateurRepository.findById(sessionUtilisateur.getUtilisateurConnecte().getId());
+//
+//        return utilisateur.map(u -> ResponseEntity.ok(zoneSurveilleRepository.findByUtilisateur(u)))
+//                .orElse(ResponseEntity.notFound().build());
+//    }
+
     @GetMapping("/zones")
-    public ResponseEntity<List<ZoneSurveille>> getZonesUtilisateur(SessionUtilisateur principal) {
-        Optional<Utilisateur> utilisateur = Optional.ofNullable(utilisateurRepository.findByEmail(principal.getUtilisateurConnecte().getNom()));
-        return utilisateur.map(u -> ResponseEntity.ok(zoneSurveilleRepository.findByUtilisateur(u)))
-                .orElse(ResponseEntity.notFound().build());
+    public ResponseEntity<List<ZoneSurveille>> getZonesUtilisateur() {
+        try {
+            Long userId = 20L; // À remplacer par l'authentification réelle
+            Optional<Utilisateur> utilisateur = utilisateurRepository.findById(userId);
+
+            if (utilisateur.isPresent()) {
+                List<ZoneSurveille> zones = zoneSurveilleRepository.findByUtilisateur(utilisateur.get());
+                return ResponseEntity.ok(zones);
+            } else {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                        .body(Collections.emptyList());
+            }
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Collections.emptyList());
+        }
     }
 
 

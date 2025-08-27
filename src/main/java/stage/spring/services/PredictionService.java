@@ -4,11 +4,16 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import stage.spring.entities.NiveauRisque;
+import stage.spring.entities.Prediction;
+import stage.spring.entities.Utilisateur;
+import stage.spring.entities.ZoneSurveille;
 
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
@@ -207,6 +212,87 @@ public class PredictionService{
                 .replaceAll("[^a-zA-Z0-9 ]", " ")  // remplace tout sauf lettres, chiffres, espaces
                 .replaceAll("\\s{2,}", " ")        // réduit les espaces multiples
                 .trim();                           // enlève les espaces au début/fin
+    }
+
+
+
+
+    ////////////////////////////////////////////////////////////////////////////////
+    ////////////////////////////////////////////////////////////////////////////////
+    ////////////////////////////////////////////////////////////////////////////////
+    ////////////////////////////////////////////////////////////////////////////////
+    ////////////////////////////////////////////////////////////////////////////////
+    ////////////////////////////////////////////////////////////////////////////////
+
+
+
+    @Autowired
+    private AgentService agentService;
+
+    public String getPrediction(double lat, double lon) {
+        String prompt = getAllDataAsString(lat, lon);
+        String clear = nettoyerMessage(prompt);
+        String res = agentService.sendPromptToAgent(clear);
+        return res;
+    }
+
+    public Prediction extractPredictionFromResponse(String agentResponse, ZoneSurveille zone, Utilisateur user) {
+        Prediction prediction = new Prediction();
+
+        try {
+            String jsonString;
+
+            // Vérifier si la réponse contient les balises ```json
+            if (agentResponse.contains("```json")) {
+                // Extraire le JSON avec les balises
+                jsonString = agentResponse.substring(agentResponse.indexOf("```json") + 7);
+                jsonString = jsonString.substring(0, jsonString.indexOf("```"));
+            } else {
+                // Si pas de balises, prendre toute la réponse comme JSON
+                jsonString = agentResponse;
+            }
+
+            jsonString = jsonString.trim();
+
+            // Parser le JSON
+            ObjectMapper objectMapper = new ObjectMapper();
+            JsonNode jsonNode = objectMapper.readTree(jsonString);
+
+            // Remplir l'entité Prediction
+            prediction.setDatePrediction(LocalDateTime.now());
+            prediction.setScoreRisque(jsonNode.get("scoreRisque").asInt());
+            prediction.setNiveauRisque(NiveauRisque.valueOf(jsonNode.get("niveauRisque").asText()));
+            prediction.setExplication(jsonNode.get("explication").asText());
+            prediction.setCausesPrincipales(jsonNode.get("causesPrincipales").asText());
+
+            // Données météo
+            if (jsonNode.has("temperature")) prediction.setTemperature(jsonNode.get("temperature").asDouble());
+            if (jsonNode.has("humidite")) prediction.setHumidite(jsonNode.get("humidite").asDouble());
+            if (jsonNode.has("vitesseVent")) prediction.setVitesseVent(jsonNode.get("vitesseVent").asDouble());
+            if (jsonNode.has("pressionAtmospherique")) prediction.setPressionAtmospherique(jsonNode.get("pressionAtmospherique").asDouble());
+
+            // Données qualité air
+            if (jsonNode.has("indiceQualiteAir")) prediction.setIndiceQualiteAir(jsonNode.get("indiceQualiteAir").asInt());
+            if (jsonNode.has("concentrationPM25")) prediction.setConcentrationPM25(jsonNode.get("concentrationPM25").asDouble());
+
+            // Données feux proches
+            if (jsonNode.has("nombreFeuxProches")) prediction.setNombreFeuxProches(jsonNode.get("nombreFeuxProches").asInt());
+            if (jsonNode.has("distanceFeuxPlusProche")) prediction.setDistanceFeuxPlusProche(jsonNode.get("distanceFeuxPlusProche").asDouble());
+            if (jsonNode.has("intensiteFeuxMax")) prediction.setIntensiteFeuxMax(jsonNode.get("intensiteFeuxMax").asDouble());
+
+            // Données topographiques
+            if (jsonNode.has("altitude")) prediction.setAltitude(jsonNode.get("altitude").asDouble());
+            if (jsonNode.has("sourcesDonnees")) prediction.setSourcesDonnees(jsonNode.get("sourcesDonnees").asText());
+
+            // Relations
+            prediction.setZoneSurveille(zone);
+            prediction.setUtilisateur(user);
+
+        } catch (Exception e) {
+            throw new RuntimeException("Erreur lors de l'extraction: " + e.getMessage(), e);
+        }
+
+        return prediction;
     }
 
 

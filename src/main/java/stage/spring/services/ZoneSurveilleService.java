@@ -35,6 +35,10 @@ public class ZoneSurveilleService {
         return zoneSurveilleRepository.save(zone);
     }
 
+    public ZoneSurveille findById(Long id) {
+        return zoneSurveilleRepository.findById(id).orElse(null);
+    }
+
 
 
 
